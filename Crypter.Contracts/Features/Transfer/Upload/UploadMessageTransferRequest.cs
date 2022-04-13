@@ -28,28 +28,26 @@ using System.Text.Json.Serialization;
 
 namespace Crypter.Contracts.Features.Transfer.Upload
 {
-   public class UploadMessageTransferRequest : IUploadTransferRequest
+   public class UploadMessageTransferRequest : IUploadMessageTransfer
    {
       public string Subject { get; set; }
-      public string CipherTextBase64 { get; set; }
-      public string SignatureBase64 { get; set; }
-      public string ClientEncryptionIVBase64 { get; set; }
-      public string ServerEncryptionKeyBase64 { get; set; }
-      public string X25519PublicKeyBase64 { get; set; }
-      public string Ed25519PublicKeyBase64 { get; set; }
-      public int LifetimeHours { get; set; }
+      public string Ciphertext { get; set; }
+      public string DigitalSignature { get; set; }
+      public string DigitalSignaturePublicKey { get; set; }
+      public string DiffieHellmanPublicKey { get; set; }
+      public string RecipientProof { get; set; }
+      public int RequestedLifetimeHours { get; set; }
 
       [JsonConstructor]
-      public UploadMessageTransferRequest(string subject, string cipherTextBase64, string signatureBase64, string clientEncryptionIVBase64, string serverEncryptionKeyBase64, string x25519PublicKeyBase64, string ed25519PublicKeyBase64, int lifetimeHours)
+      public UploadMessageTransferRequest(string subject, string ciphertext, string digitalSignature, string digitalSignaturePublicKey, string diffieHellmanPublicKey, string recipientProof, int lifetimeHours)
       {
          Subject = subject;
-         CipherTextBase64 = cipherTextBase64;
-         SignatureBase64 = signatureBase64;
-         ClientEncryptionIVBase64 = clientEncryptionIVBase64;
-         ServerEncryptionKeyBase64 = serverEncryptionKeyBase64;
-         X25519PublicKeyBase64 = x25519PublicKeyBase64;
-         Ed25519PublicKeyBase64 = ed25519PublicKeyBase64;
-         LifetimeHours = lifetimeHours;
+         Ciphertext = ciphertext;
+         DigitalSignature = digitalSignature;
+         DigitalSignaturePublicKey = digitalSignaturePublicKey;
+         DiffieHellmanPublicKey = diffieHellmanPublicKey;
+         RecipientProof = recipientProof;
+         RequestedLifetimeHours = lifetimeHours;
       }
    }
 }

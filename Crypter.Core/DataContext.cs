@@ -24,7 +24,7 @@
  * Contact the current copyright holder to discuss commercial license options.
  */
 
-using Crypter.Core.Models;
+using Crypter.Core.DataModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -54,15 +54,78 @@ namespace Crypter.Core
       public DbSet<UserNotificationSetting> UserNotificationSettings { get; set; }
       public DbSet<UserToken> UserTokens { get; set; }
       public DbSet<UserContact> UserContacts { get; set; }
-      public DbSet<FileTransfer> FileTransfers { get; set; }
-      public DbSet<MessageTransfer> MessageTransfers { get; set; }
+      public DbSet<AnonymousFileTransfer> AnonymousFileTransfers { get; set; }
+      public DbSet<AnonymousMessageTransfer> AnonymousMessageTransfers { get; set; }
+      public DbSet<UserFileTransfer> UserFileTransfers { get; set; }
+      public DbSet<UserMessageTransfer> UserMessageTransfers { get; set; }
       public DbSet<Schema> Schema { get; set; }
 
       protected override void OnModelCreating(ModelBuilder builder)
       {
+         ConfigureUser(builder);
+         ConfigureUserMessageTransfer(builder);
+         ConfigureUserFileTransfer(builder);
+      }
+
+      private static void ConfigureUser(ModelBuilder builder)
+      {
          builder.Entity<User>()
             .HasMany(x => x.Contacts)
             .WithOne(x => x.Owner);
+
+         builder.Entity<User>()
+            .HasMany(x => x.SentFileTransfers)
+            .WithOne(x => x.Sender)
+            .HasForeignKey(x => x.SenderId);
+
+         builder.Entity<User>()
+            .HasMany(x => x.ReceivedFileTransfers)
+            .WithOne(x => x.Recipient)
+            .HasForeignKey(x => x.RecipientId);
+
+         builder.Entity<User>()
+            .HasMany(x => x.SentMessageTransfers)
+            .WithOne(x => x.Sender)
+            .HasForeignKey(x => x.SenderId);
+
+         builder.Entity<User>()
+            .HasMany(x => x.ReceivedMessageTransfers)
+            .WithOne(x => x.Recipient)
+            .HasForeignKey(x => x.RecipientId);
+      }
+
+      private static void ConfigureUserMessageTransfer(ModelBuilder builder)
+      {
+         builder.Entity<UserMessageTransfer>()
+            .ToTable("UserMessageTransfer");
+
+         builder.Entity<UserMessageTransfer>()
+            .HasKey(x => x.Id);
+
+         builder.Entity<UserMessageTransfer>()
+            .Property(x => x.SenderId)
+            .HasColumnName("Sender");
+
+         builder.Entity<UserMessageTransfer>()
+            .Property(x => x.RecipientId)
+            .HasColumnName("Recipient");
+      }
+
+      private static void ConfigureUserFileTransfer(ModelBuilder builder)
+      {
+         builder.Entity<UserFileTransfer>()
+            .ToTable("UserFileTransfer");
+
+         builder.Entity<UserFileTransfer>()
+            .HasKey(x => x.Id);
+
+         builder.Entity<UserFileTransfer>()
+            .Property(x => x.SenderId)
+            .HasColumnName("Sender");
+
+         builder.Entity<UserFileTransfer>()
+            .Property(x => x.RecipientId)
+            .HasColumnName("Recipient");
       }
    }
 }

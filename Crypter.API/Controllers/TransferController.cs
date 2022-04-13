@@ -25,16 +25,16 @@
  */
 
 using Crypter.API.Services;
+using Crypter.Common.Monads;
 using Crypter.Contracts.Common;
 using Crypter.Contracts.Features.Transfer.DownloadCiphertext;
 using Crypter.Contracts.Features.Transfer.DownloadPreview;
 using Crypter.Contracts.Features.Transfer.DownloadSignature;
 using Crypter.Contracts.Features.Transfer.Upload;
-using Crypter.Core.Interfaces;
-using Crypter.CryptoLib.Services;
+using Crypter.Core.Features.Transfer.Commands;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,41 +44,118 @@ namespace Crypter.API.Controllers
    [Route("api/transfer")]
    public class TransferController : ControllerBase
    {
-      private readonly UploadService _uploadService;
-      private readonly DownloadService _downloadService;
+      private readonly IMediator _mediator;
       private readonly ITokenService _tokenService;
 
-      public TransferController(IConfiguration configuration,
-          IBaseTransferService<IMessageTransferItem> messageService,
-          IBaseTransferService<IFileTransferItem> fileService,
-          IUserService userService,
-          IUserProfileService userProfileService,
-          IEmailService emailService,
-          IApiValidationService apiValidationService,
-          ISimpleEncryptionService simpleEncryptionService,
-          ISimpleHashService simpleHashService,
-          ITokenService tokenService
-         )
+      public TransferController(IMediator mediator, ITokenService tokenService)
       {
-         _uploadService = new UploadService(configuration, messageService, fileService, emailService, apiValidationService, simpleEncryptionService, userService, simpleHashService);
-         _downloadService = new DownloadService(configuration, messageService, fileService, userService, userProfileService, simpleEncryptionService, simpleHashService);
+         _mediator = mediator;
          _tokenService = tokenService;
       }
 
       [HttpPost("message")]
       [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UploadTransferResponse))]
       [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
-      public async Task<IActionResult> MessageTransferAsync([FromBody] UploadMessageTransferRequest request, CancellationToken cancellationToken)
+      public async Task<IActionResult> UploadAnonymousMessageTransferAsync([FromBody] UploadMessageTransferRequest request, CancellationToken cancellationToken)
       {
-         var senderId = _tokenService.TryParseUserId(User)
-            .IfNone(Guid.Empty);
-         return await _uploadService.ReceiveMessageTransferAsync(request, senderId, string.Empty, cancellationToken);
+         Maybe<Guid> senderId = _tokenService.TryParseUserId(User);
+
+         var insertMessageCommand = new InsertAnonymousMessageTransferCommand(senderId, Maybe<Guid>.None, request.Subject);
+
+         var insertMessageResult = await _mediator.Send(insertMessageCommand, cancellationToken);
+
+         var serverHasSpaceRemaining = await ApiValidationService.IsEnoughSpaceForNewTransferAsync(AllocatedDiskSpace, MaxUploadSize, cancellationToken);
+         if (!serverHasSpaceRemaining)
+         {
+            return (false, UploadTransferError.OutOfSpace, null, null);
+         }
+
+         byte[] hashedSymmetricEncryptionKey;
+         try
+         {
+            hashedSymmetricEncryptionKey = Convert.FromBase64String(request.ServerEncryptionKeyBase64);
+         }
+         catch (Exception)
+         {
+            return (false, UploadTransferError.InvalidServerEncryptionKey, null, null);
+         }
+
+         byte[] originalCiphertextBytes;
+         try
+         {
+            originalCiphertextBytes = Convert.FromBase64String(request.Ciphertext);
+         }
+         catch (Exception)
+         {
+            return (false, UploadTransferError.InvalidCipherText, null, null);
+         }
+
+         if (request.RequestedLifetimeHours > 24 || request.RequestedLifetimeHours < 1)
+         {
+            return (false, UploadTransferError.InvalidRequestedLifetimeHours, null, null);
+         }
+
+         // Digest the ciphertext BEFORE applying server-side encryption
+         var serverDigest = ItemDigestFunction(originalCiphertextBytes);
+
+         // Apply server-side encryption
+         if (hashedSymmetricEncryptionKey.Length != 32)
+         {
+            return (false, UploadTransferError.InvalidServerEncryptionKey, null, null);
+         }
+
+         var (serverEncryptedCiphertext, serverIV) = SimpleEncryptionService.Encrypt(hashedSymmetricEncryptionKey, originalCiphertextBytes);
+
+         Guid itemId = Guid.NewGuid();
+         var created = DateTime.UtcNow;
+         var expiration = created.AddHours(request.RequestedLifetimeHours);
+
+         var returnItem = new BaseTransfer(itemId, senderId, recipientId, originalCiphertextBytes.Length, request.ClientEncryptionIVBase64, request.DigitalSignature, request.DiffieHellmanPublicKey, request.DigitalSignaturePublicKey, serverIV, serverDigest, created, expiration);
+         return (true, UploadTransferError.UnknownError, returnItem, serverEncryptedCiphertext);
+
+         (var success, var errorCode, var genericTransferData, var ciphertextServerEncrypted) = await ReceiveTransferAsync(request, senderId, recipientId, cancellationToken);
+
+         if (!success || genericTransferData is null)
+         {
+            return new BadRequestObjectResult(new ErrorResponse(errorCode));
+         }
+
+         var saveResult = await MessageTransferItemStorageService.SaveAsync(genericTransferData.Id, ciphertextServerEncrypted, cancellationToken);
+         if (!saveResult)
+         {
+            return new BadRequestObjectResult(new ErrorResponse(UploadTransferError.UnknownError));
+         }
+
+         var messageItem = new MessageTransfer(
+               genericTransferData.Id,
+               senderId,
+               recipientId,
+               request.Subject,
+               genericTransferData.Size,
+               genericTransferData.ClientIV,
+               genericTransferData.Signature,
+               genericTransferData.X25519PublicKey,
+               genericTransferData.Ed25519PublicKey,
+               genericTransferData.ServerIV,
+               genericTransferData.ServerDigest,
+               genericTransferData.Created,
+               genericTransferData.Expiration);
+
+         await MessageTransferService.InsertAsync(messageItem, default);
+
+         if (recipientId != Guid.Empty)
+         {
+            BackgroundJob.Enqueue(() => EmailService.HangfireSendTransferNotificationAsync(TransferItemType.Message, messageItem.Id));
+         }
+
+         return new OkObjectResult(
+             new UploadTransferResponse(genericTransferData.Id, genericTransferData.Expiration));
       }
 
-      [HttpPost("message/{recipient}")]
+      [HttpPost("message/{recipientUsername}")]
       [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UploadTransferResponse))]
       [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
-      public async Task<IActionResult> UserMessageTransferAsync([FromBody] UploadMessageTransferRequest request, string recipient, CancellationToken cancellationToken)
+      public async Task<IActionResult> UploadUserMessageTransferAsync([FromBody] UploadMessageTransferRequest request, string recipientUsername, CancellationToken cancellationToken)
       {
          var senderId = _tokenService.TryParseUserId(User)
             .IfNone(Guid.Empty);
@@ -95,10 +172,10 @@ namespace Crypter.API.Controllers
          return await _uploadService.ReceiveFileTransferAsync(request, senderId, string.Empty, cancellationToken);
       }
 
-      [HttpPost("file/{recipient}")]
+      [HttpPost("file/{recipientUsername}")]
       [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UploadTransferResponse))]
       [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
-      public async Task<IActionResult> UserFileTransferAsync([FromBody] UploadFileTransferRequest request, string recipient, CancellationToken cancellationToken)
+      public async Task<IActionResult> UserFileTransferAsync([FromBody] UploadFileTransferRequest request, string recipientUsername, CancellationToken cancellationToken)
       {
          var senderId = _tokenService.TryParseUserId(User)
             .IfNone(Guid.Empty);

@@ -27,7 +27,7 @@
 using Crypter.Common.Primitives;
 using Crypter.Contracts.Features.User.UpdateContactInfo;
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
+using Crypter.Core.DataModels;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;

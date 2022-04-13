@@ -65,7 +65,7 @@ namespace Crypter.CryptoLib.Crypto
       /// </returns>
       public static byte[] GenerateIV()
       {
-         SecureRandom random = new();
+         var random = new SecureRandom();
          return random.GenerateSeed(16);
       }
 

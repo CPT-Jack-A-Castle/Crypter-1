@@ -27,7 +27,6 @@
 using Crypter.API.Methods;
 using Crypter.API.Services;
 using Crypter.Common.Enums;
-using Crypter.Common.Monads;
 using Crypter.Common.Primitives;
 using Crypter.Contracts.Common;
 using Crypter.Contracts.Features.User.AddContact;
@@ -46,10 +45,10 @@ using Crypter.Contracts.Features.User.UpdateNotificationSettings;
 using Crypter.Contracts.Features.User.UpdatePrivacySettings;
 using Crypter.Contracts.Features.User.UpdateProfile;
 using Crypter.Contracts.Features.User.VerifyEmailAddress;
+using Crypter.Core.DataModels;
 using Crypter.Core.Features.User.Commands;
 using Crypter.Core.Features.User.Queries;
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
 using Crypter.CryptoLib;
 using Crypter.CryptoLib.Crypto;
 using Hangfire;
@@ -77,8 +76,6 @@ namespace Crypter.API.Controllers
       private readonly IUserPrivacySettingService _userPrivacySettingService;
       private readonly IUserEmailVerificationService _userEmailVerificationService;
       private readonly IUserNotificationSettingService _userNotificationSettingService;
-      private readonly IBaseTransferService<IMessageTransferItem> _messageTransferService;
-      private readonly IBaseTransferService<IFileTransferItem> _fileTransferService;
       private readonly IEmailService _emailService;
       private readonly ITokenService _tokenService;
       private readonly IMediator _mediator;
@@ -91,8 +88,6 @@ namespace Crypter.API.Controllers
           IUserPrivacySettingService userPrivacySettingService,
           IUserEmailVerificationService userEmailVerificationService,
           IUserNotificationSettingService userNotificationSettingService,
-          IBaseTransferService<IMessageTransferItem> messageService,
-          IBaseTransferService<IFileTransferItem> fileService,
           IEmailService emailService,
           ITokenService tokenService,
           IMediator mediator
@@ -105,8 +100,6 @@ namespace Crypter.API.Controllers
          _userPrivacySettingService = userPrivacySettingService;
          _userEmailVerificationService = userEmailVerificationService;
          _userNotificationSettingService = userNotificationSettingService;
-         _messageTransferService = messageService;
-         _fileTransferService = fileService;
          _emailService = emailService;
          _tokenService = tokenService;
          _mediator = mediator;
@@ -250,7 +243,7 @@ namespace Crypter.API.Controllers
                sender = await _userService.ReadAsync(item.Sender, cancellationToken);
                senderProfile = await _userProfileService.ReadAsync(item.Sender, cancellationToken);
             }
-            receivedFiles.Add(new UserReceivedFileDTO(item.Id, item.FileName, item.Sender, sender?.Username, senderProfile?.Alias, item.Expiration));
+            receivedFiles.Add(new UserReceivedFileDTO(item.Id, item.FileName, sender?.Username, senderProfile?.Alias, item.Expiration));
          }
 
          return new OkObjectResult(new UserReceivedFilesResponse(receivedFiles));

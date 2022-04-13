@@ -25,7 +25,7 @@
  */
 
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
+using Crypter.Core.DataModels;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,7 +58,7 @@ namespace Crypter.Core.Services.DataAccess
          await Context.SaveChangesAsync(cancellationToken);
       }
 
-      public async Task<IUserNotificationSetting> ReadAsync(Guid userId, CancellationToken cancellationToken)
+      public async Task<UserNotificationSetting> ReadAsync(Guid userId, CancellationToken cancellationToken)
       {
          return await Context.UserNotificationSettings.FindAsync(new object[] { userId }, cancellationToken);
       }

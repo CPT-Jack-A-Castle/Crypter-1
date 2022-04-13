@@ -25,6 +25,7 @@
  */
 
 using Crypter.Core.Interfaces;
+using Crypter.Core.DataModels;
 using Microsoft.EntityFrameworkCore;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,7 +41,7 @@ namespace Crypter.Core.Services.DataAccess
          Context = context;
       }
 
-      public async Task<ISchema> ReadAsync(CancellationToken cancellationToken)
+      public async Task<Schema> ReadAsync(CancellationToken cancellationToken)
       {
          return await Context.Schema.FirstOrDefaultAsync(cancellationToken);
       }

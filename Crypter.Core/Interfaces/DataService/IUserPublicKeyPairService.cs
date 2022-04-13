@@ -24,6 +24,7 @@
  * Contact the current copyright holder to discuss commercial license options.
  */
 
+using Crypter.Core.DataModels.Interfaces;
 using System;
 using System.Threading;
 using System.Threading.Tasks;

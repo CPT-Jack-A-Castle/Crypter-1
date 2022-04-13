@@ -25,7 +25,6 @@
  */
 
 using Crypter.Common.Enums;
-using Crypter.Core.Interfaces;
 using System;
 using System.IO;
 using System.Threading;
@@ -33,7 +32,7 @@ using System.Threading.Tasks;
 
 namespace Crypter.Core.Services
 {
-   public class TransferItemStorageService : ITransferItemStorageService
+   public class TransferItemStorageService
    {
       private readonly string StoragePath;
       private readonly TransferItemType ItemType;

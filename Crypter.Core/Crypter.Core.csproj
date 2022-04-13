@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Crypter.Contracts\Crypter.Contracts.csproj" />
     <ProjectReference Include="..\Crypter.CryptoLib\Crypter.CryptoLib.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Features\Transfer\Queries\" />
+  </ItemGroup>
 </Project>

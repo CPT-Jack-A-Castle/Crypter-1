@@ -25,6 +25,7 @@
  */
 
 using Crypter.Contracts.Features.User.GetContacts;
+using Crypter.Core.DataModels;
 using Crypter.Core.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -59,7 +60,7 @@ namespace Crypter.Core.Features.User.Queries
 
       public async Task<IEnumerable<UserContactDTO>> Handle(UserContactsQuery request, CancellationToken cancellationToken)
       {
-         List<Models.UserContact> contacts = await _context.UserContacts
+         List<UserContact> contacts = await _context.UserContacts
             .Where(x => x.OwnerId == request.User)
             .Include(x => x.Contact)
                .ThenInclude(x => x.Profile)

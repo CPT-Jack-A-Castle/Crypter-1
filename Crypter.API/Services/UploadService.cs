@@ -28,8 +28,6 @@ using Crypter.Common.Enums;
 using Crypter.Contracts.Common;
 using Crypter.Contracts.Features.Transfer.Upload;
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
-using Crypter.Core.Services;
 using Crypter.CryptoLib.Services;
 using Hangfire;
 using Microsoft.AspNetCore.Mvc;
@@ -45,12 +43,8 @@ namespace Crypter.API.Services
       private readonly long AllocatedDiskSpace;
       private readonly long MaxUploadSize;
 
-      private readonly IBaseTransferService<IMessageTransferItem> MessageTransferService;
-      private readonly IBaseTransferService<IFileTransferItem> FileTransferService;
       private readonly IEmailService EmailService;
       private readonly IApiValidationService ApiValidationService;
-      private readonly ITransferItemStorageService MessageTransferItemStorageService;
-      private readonly ITransferItemStorageService FileTransferItemStorageService;
       private readonly ISimpleEncryptionService SimpleEncryptionService;
       private readonly ISimpleHashService SimpleHashService;
       private readonly IUserService UserService;
@@ -58,8 +52,6 @@ namespace Crypter.API.Services
 
       public UploadService(
          IConfiguration configuration,
-         IBaseTransferService<IMessageTransferItem> messageTransferService,
-         IBaseTransferService<IFileTransferItem> fileTransferService,
          IEmailService emailService,
          IApiValidationService apiValidationService,
          ISimpleEncryptionService simpleEncryptionService,
@@ -69,19 +61,15 @@ namespace Crypter.API.Services
       {
          AllocatedDiskSpace = long.Parse(configuration["EncryptedFileStore:AllocatedGB"]) * (long)Math.Pow(2, 30);
          MaxUploadSize = long.Parse(configuration["MaxUploadSizeMB"]) * (long)Math.Pow(2, 20);
-         MessageTransferService = messageTransferService;
-         FileTransferService = fileTransferService;
          EmailService = emailService;
          ApiValidationService = apiValidationService;
-         MessageTransferItemStorageService = new TransferItemStorageService(configuration["EncryptedFileStore:Location"], TransferItemType.Message);
-         FileTransferItemStorageService = new TransferItemStorageService(configuration["EncryptedFileStore:Location"], TransferItemType.File);
          SimpleEncryptionService = simpleEncryptionService;
          UserService = userService;
          SimpleHashService = simpleHashService;
          ItemDigestFunction = SimpleHashService.DigestSha256;
       }
 
-      private async Task<(bool Success, UploadTransferError ErrorCode, IBaseTransferItem? GenericTransferData, byte[]? ServerEncryptedCipherText)> ReceiveTransferAsync(IUploadTransferRequest request, Guid senderId, Guid recipientId, CancellationToken cancellationToken)
+      private async Task<(bool Success, UploadTransferError ErrorCode, IBaseTransferItem? GenericTransferData, byte[]? ServerEncryptedCipherText)> ReceiveTransferAsync(IUploadTransferRequestBase request, Guid senderId, Guid recipientId, CancellationToken cancellationToken)
       {
          var serverHasSpaceRemaining = await ApiValidationService.IsEnoughSpaceForNewTransferAsync(AllocatedDiskSpace, MaxUploadSize, cancellationToken);
          if (!serverHasSpaceRemaining)
@@ -102,16 +90,16 @@ namespace Crypter.API.Services
          byte[] originalCiphertextBytes;
          try
          {
-            originalCiphertextBytes = Convert.FromBase64String(request.CipherTextBase64);
+            originalCiphertextBytes = Convert.FromBase64String(request.Ciphertext);
          }
          catch (Exception)
          {
             return (false, UploadTransferError.InvalidCipherText, null, null);
          }
 
-         if (request.LifetimeHours > 24 || request.LifetimeHours < 1)
+         if (request.RequestedLifetimeHours > 24 || request.RequestedLifetimeHours < 1)
          {
-            return (false, UploadTransferError.InvalidRequestedExpiration, null, null);
+            return (false, UploadTransferError.InvalidRequestedLifetimeHours, null, null);
          }
 
          // Digest the ciphertext BEFORE applying server-side encryption
@@ -127,13 +115,13 @@ namespace Crypter.API.Services
 
          Guid itemId = Guid.NewGuid();
          var created = DateTime.UtcNow;
-         var expiration = created.AddHours(request.LifetimeHours);
+         var expiration = created.AddHours(request.RequestedLifetimeHours);
 
-         var returnItem = new BaseTransfer(itemId, senderId, recipientId, originalCiphertextBytes.Length, request.ClientEncryptionIVBase64, request.SignatureBase64, request.X25519PublicKeyBase64, request.Ed25519PublicKeyBase64, serverIV, serverDigest, created, expiration);
+         var returnItem = new BaseTransfer(itemId, senderId, recipientId, originalCiphertextBytes.Length, request.ClientEncryptionIVBase64, request.DigitalSignature, request.DiffieHellmanPublicKey, request.DigitalSignaturePublicKey, serverIV, serverDigest, created, expiration);
          return (true, UploadTransferError.UnknownError, returnItem, serverEncryptedCiphertext);
       }
 
-      public async Task<IActionResult> ReceiveMessageTransferAsync(UploadMessageTransferRequest request, Guid senderId, string recipient, CancellationToken cancellationToken)
+      public async Task<IActionResult> ReceiveMessageTransferAsync(UploadTransferRequest request, Guid senderId, string recipient, CancellationToken cancellationToken)
       {
          Guid recipientId = Guid.Empty;
 
@@ -226,7 +214,7 @@ namespace Crypter.API.Services
                genericTransferData.Id,
                senderId,
                recipientId,
-               request.FileName,
+               request.Filename,
                request.ContentType,
                genericTransferData.Size,
                genericTransferData.ClientIV,

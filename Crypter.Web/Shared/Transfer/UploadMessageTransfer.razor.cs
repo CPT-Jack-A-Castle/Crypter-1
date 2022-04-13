@@ -74,11 +74,11 @@ namespace Crypter.Web.Shared.Transfer
             Encoding.UTF8.GetBytes(KeyConversion.ConvertX25519PrivateKeyFromPEM(senderX25519PrivateKey).GeneratePublicKey().ConvertToPEM().Value));
          var encodedECDSASenderKey = Convert.ToBase64String(
             Encoding.UTF8.GetBytes(KeyConversion.ConvertEd25519PrivateKeyFromPEM(senderEd25519PrivateKey).GeneratePublicKey().ConvertToPEM().Value));
-         var encodedServerEncryptionKey = Convert.ToBase64String(serverKey);
+         var encodedRecipientProof = Convert.ToBase64String(serverKey);
          var encodedSignature = Convert.ToBase64String(signature);
          var encodedClientIV = Convert.ToBase64String(iv);
 
-         var request = new UploadMessageTransferRequest(MessageSubject, encodedCipherText, encodedSignature, encodedClientIV, encodedServerEncryptionKey, encodedECDHSenderKey, encodedECDSASenderKey, RequestedExpirationHours);
+         var request = new UploadMessageTransferRequest(MessageSubject, encodedCipherText, encodedSignature, encodedECDSASenderKey, encodedECDHSenderKey, encodedRecipientProof, RequestedExpirationHours);
          var uploadResponse = await CrypterApiService.UploadMessageTransferAsync(request, Recipient, UserSessionService.LoggedIn);
          uploadResponse.DoLeft(x =>
          {

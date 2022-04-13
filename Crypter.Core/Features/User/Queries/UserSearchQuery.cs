@@ -83,12 +83,12 @@ namespace Crypter.Core.Features.User.Queries
       {
          string lowerKeyword = request.Keyword.ToLower();
 
-         IQueryable<Models.User> baseQuery = _context.Users
+         IQueryable<DataModels.User> baseQuery = _context.Users
             .Where(x => x.Username.ToLower().StartsWith(lowerKeyword)
                || x.Profile.Alias.ToLower().StartsWith(lowerKeyword))
             .Where(LinqExtensions.UserProfileIsComplete());
 
-         IQueryable<Models.User> baseQueryWithPrivacy = baseQuery
+         IQueryable<DataModels.User> baseQueryWithPrivacy = baseQuery
             .Where(LinqExtensions.UserPrivacyAllowsVisitor(request.RequestorId));
 
          int totalMatches = await baseQueryWithPrivacy

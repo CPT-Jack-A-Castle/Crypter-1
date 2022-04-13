@@ -25,7 +25,7 @@
  */
 
 using Crypter.Common.Enums;
-using Crypter.Core.Models;
+using Crypter.Core.DataModels;
 using MediatR;
 using System;
 using System.Threading;

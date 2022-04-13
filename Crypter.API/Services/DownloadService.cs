@@ -24,16 +24,13 @@
  * Contact the current copyright holder to discuss commercial license options.
  */
 
-using Crypter.Common.Enums;
 using Crypter.Contracts.Common;
 using Crypter.Contracts.Features.Transfer.DownloadCiphertext;
 using Crypter.Contracts.Features.Transfer.DownloadPreview;
 using Crypter.Contracts.Features.Transfer.DownloadSignature;
 using Crypter.Core.Interfaces;
-using Crypter.Core.Services;
 using Crypter.CryptoLib.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,32 +39,21 @@ namespace Crypter.API.Services
 {
    public class DownloadService
    {
-      private readonly IBaseTransferService<IMessageTransferItem> MessageService;
-      private readonly IBaseTransferService<IFileTransferItem> FileService;
       private readonly IUserService UserService;
       private readonly IUserProfileService UserProfileService;
-      private readonly ITransferItemStorageService MessageTransferItemStorageService;
-      private readonly ITransferItemStorageService FileTransferItemStorageService;
       private readonly ISimpleEncryptionService SimpleEncryptionService;
       private readonly ISimpleHashService SimpleHashService;
       private readonly Func<byte[], byte[]> ItemDigestFunction;
 
       public DownloadService(
-         IConfiguration configuration,
-         IBaseTransferService<IMessageTransferItem> messageService,
-         IBaseTransferService<IFileTransferItem> fileService,
          IUserService userService,
          IUserProfileService userProfileService,
          ISimpleEncryptionService simpleEncryptionService,
          ISimpleHashService simpleHashService
          )
       {
-         MessageService = messageService;
-         FileService = fileService;
          UserService = userService;
          UserProfileService = userProfileService;
-         MessageTransferItemStorageService = new TransferItemStorageService(configuration["EncryptedFileStore:Location"], TransferItemType.Message);
-         FileTransferItemStorageService = new TransferItemStorageService(configuration["EncryptedFileStore:Location"], TransferItemType.File);
          SimpleEncryptionService = simpleEncryptionService;
          SimpleHashService = simpleHashService;
          ItemDigestFunction = SimpleHashService.DigestSha256;

@@ -30,7 +30,7 @@ using Crypter.Common.Primitives;
 using Crypter.Contracts.Features.User.Register;
 using Crypter.Core.Features.User.Common;
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
+using Crypter.Core.DataModels;
 using MediatR;
 using System;
 using System.Threading;
@@ -121,7 +121,7 @@ namespace Crypter.Core.Features.User.Commands
 
          (byte[] passwordSalt, byte[] passwordHash) = _passwordHashService.MakeSecurePasswordHash(request.Password);
 
-         Models.User user = new(Guid.NewGuid(), request.Username, request.EmailAddress, passwordHash, passwordSalt, false, DateTime.UtcNow, DateTime.MinValue);
+         DataModels.User user = new(Guid.NewGuid(), request.Username, request.EmailAddress, passwordHash, passwordSalt, false, DateTime.UtcNow, DateTime.MinValue);
          user.Profile = new UserProfile(user.Id, null, null, null);
          user.PrivacySetting = new UserPrivacySetting(user.Id, true, UserVisibilityLevel.Everyone, UserItemTransferPermission.Everyone, UserItemTransferPermission.Everyone);
          user.NotificationSetting = new UserNotificationSetting(user.Id, false, false);

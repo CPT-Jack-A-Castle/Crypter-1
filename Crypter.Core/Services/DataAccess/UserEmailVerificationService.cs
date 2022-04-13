@@ -25,7 +25,7 @@
  */
 
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
+using Crypter.Core.DataModels;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
@@ -51,12 +51,12 @@ namespace Crypter.Core.Services.DataAccess
          return true;
       }
 
-      public async Task<IUserEmailVerification> ReadAsync(Guid userId, CancellationToken cancellationToken)
+      public async Task<UserEmailVerification> ReadAsync(Guid userId, CancellationToken cancellationToken)
       {
          return await Context.UserEmailVerifications.FindAsync(new object[] { userId }, cancellationToken);
       }
 
-      public async Task<IUserEmailVerification> ReadCodeAsync(Guid code, CancellationToken cancellationToken)
+      public async Task<UserEmailVerification> ReadCodeAsync(Guid code, CancellationToken cancellationToken)
       {
          return await Context.UserEmailVerifications
             .Where(x => x.Code == code)

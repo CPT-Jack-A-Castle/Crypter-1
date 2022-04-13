@@ -28,8 +28,8 @@ using Crypter.API.Models;
 using Crypter.API.Services;
 using Crypter.API.Startup;
 using Crypter.Core;
+using Crypter.Core.DataModels;
 using Crypter.Core.Interfaces;
-using Crypter.Core.Models;
 using Crypter.Core.Services;
 using Crypter.Core.Services.DataAccess;
 using Crypter.CryptoLib.Services;
@@ -63,8 +63,6 @@ builder.Services.AddScoped<IUserPublicKeyPairService<UserEd25519KeyPair>, UserEd
 builder.Services.AddScoped<IUserEmailVerificationService, UserEmailVerificationService>();
 builder.Services.AddScoped<IUserNotificationSettingService, UserNotificationSettingService>();
 builder.Services.AddScoped<IUserTokenService, UserTokenService>();
-builder.Services.AddScoped<IBaseTransferService<IMessageTransferItem>, MessageTransferItemService>();
-builder.Services.AddScoped<IBaseTransferService<IFileTransferItem>, FileTransferItemService>();
 builder.Services.AddScoped<ISchemaService, SchemaService>();
 
 builder.Services.AddMediatR(Assembly.GetAssembly(typeof(Crypter.Core.DataContext))!);

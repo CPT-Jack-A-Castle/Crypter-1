@@ -27,12 +27,15 @@
 using Crypter.API.Methods;
 using Crypter.API.Models;
 using Crypter.Common.Enums;
+using Crypter.Common.Monads;
 using Crypter.Common.Primitives;
+using Crypter.Core.Features.User.Queries;
 using Crypter.Core.Interfaces;
 using Crypter.CryptoLib;
 using Crypter.CryptoLib.Crypto;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using MediatR;
 using MimeKit;
 using Org.BouncyCastle.Crypto;
 using System;
@@ -55,21 +58,18 @@ namespace Crypter.API.Services
    {
       private readonly EmailSettings Settings;
 
+      private readonly IMediator _mediator;
       private readonly IUserService UserService;
       private readonly IUserEmailVerificationService UserEmailVerificationService;
       private readonly IUserNotificationSettingService UserNotificationSettingService;
-      private readonly IBaseTransferService<IMessageTransferItem> MessageTransferService;
-      private readonly IBaseTransferService<IFileTransferItem> FileTransferService;
 
-      public EmailService(EmailSettings emailSettings, IUserService userService, IUserEmailVerificationService userEmailVerificationService, IUserNotificationSettingService userNotificationSettingService,
-         IBaseTransferService<IMessageTransferItem> messageTransferService, IBaseTransferService<IFileTransferItem> fileTransferService)
+      public EmailService(EmailSettings emailSettings, IMediator mediator, IUserService userService, IUserEmailVerificationService userEmailVerificationService, IUserNotificationSettingService userNotificationSettingService)
       {
          Settings = emailSettings;
+         _mediator = mediator;
          UserService = userService;
          UserEmailVerificationService = userEmailVerificationService;
          UserNotificationSettingService = userNotificationSettingService;
-         MessageTransferService = messageTransferService;
-         FileTransferService = fileTransferService;
       }
 
       /// <summary>
@@ -184,52 +184,44 @@ namespace Crypter.API.Services
 
       public async Task HangfireSendTransferNotificationAsync(TransferItemType itemType, Guid itemId)
       {
-         Guid recipientId;
-
+         Maybe<Guid> recipientId = Maybe<Guid>.None;
          switch (itemType)
          {
             case TransferItemType.Message:
-               var message = await MessageTransferService.ReadAsync(itemId, CancellationToken.None);
-               if (message is null)
-               {
-                  return;
-               }
-
-               recipientId = message.Recipient;
+               var foundMessage = await _mediator.Send(new UserMessageTransferQuery(itemId), CancellationToken.None);
+               recipientId = foundMessage.Bind(x => x.RecipientId ?? Maybe<Guid>.None);
                break;
             case TransferItemType.File:
-               var file = await FileTransferService.ReadAsync(itemId, CancellationToken.None);
-               if (file is null)
-               {
-                  return;
-               }
-
-               recipientId = file.Recipient;
+               var foundFile = await _mediator.Send(new UserFileTransferQuery(itemId), CancellationToken.None);
+               recipientId = foundFile.Bind(x => x.RecipientId ?? Maybe<Guid>.None);
                break;
             default:
+               break;
+         }
+
+         await recipientId.IfSomeAsync(async x =>
+         {
+            var user = await UserService.ReadAsync(x, CancellationToken.None);
+            if (user is null || !user.EmailVerified)
+            {
                return;
-         }
+            }
 
-         var user = await UserService.ReadAsync(recipientId, CancellationToken.None);
-         if (user is null || !user.EmailVerified)
-         {
-            return;
-         }
+            if (!EmailAddress.TryFrom(user.Email, out var emailAddress))
+            {
+               return;
+            }
 
-         if (!EmailAddress.TryFrom(user.Email, out var emailAddress))
-         {
-            return;
-         }
+            var userNotification = await UserNotificationSettingService.ReadAsync(x, CancellationToken.None);
+            if (userNotification is null
+               || !userNotification.EnableTransferNotifications
+               || !userNotification.EmailNotifications)
+            {
+               return;
+            }
 
-         var userNotification = await UserNotificationSettingService.ReadAsync(recipientId, CancellationToken.None);
-         if (userNotification is null
-            || !userNotification.EnableTransferNotifications
-            || !userNotification.EmailNotifications)
-         {
-            return;
-         }
-
-         await SendTransferNotificationAsync(emailAddress);
+            await SendTransferNotificationAsync(emailAddress);
+         });
       }
    }
 }

@@ -127,14 +127,14 @@ namespace Crypter.Web.Shared.Transfer
             Encoding.UTF8.GetBytes(KeyConversion.ConvertX25519PrivateKeyFromPEM(senderX25519PrivateKey).GeneratePublicKey().ConvertToPEM().Value));
          var encodedECDSASenderKey = Convert.ToBase64String(
             Encoding.UTF8.GetBytes(KeyConversion.ConvertEd25519PrivateKeyFromPEM(senderEd25519PrivateKey).GeneratePublicKey().ConvertToPEM().Value));
-         var encodedServerEncryptionKey = Convert.ToBase64String(serverKey);
+         var encodedRecipientProof = Convert.ToBase64String(serverKey);
          var encodedSignature = Convert.ToBase64String(signature);
          var fileType = string.IsNullOrEmpty(SelectedFile.ContentType)
             ? "application/unknown"
             : SelectedFile.ContentType;
          var encodedClientIV = Convert.ToBase64String(iv);
 
-         var request = new UploadFileTransferRequest(SelectedFile.Name, fileType, encodedCipherText, encodedSignature, encodedClientIV, encodedServerEncryptionKey, encodedECDHSenderKey, encodedECDSASenderKey, RequestedExpirationHours);
+         var request = new UploadFileTransferRequest(SelectedFile.Name, fileType, encodedCipherText, encodedSignature, encodedECDSASenderKey, encodedECDHSenderKey, encodedRecipientProof, RequestedExpirationHours);
          var uploadResponse = await CrypterApiService.UploadFileTransferAsync(request, Recipient, UserSessionService.LoggedIn);
          uploadResponse.DoLeft(x =>
          {

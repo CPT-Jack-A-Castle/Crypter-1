@@ -29,17 +29,14 @@ namespace Crypter.Contracts.Features.Transfer.Upload
    public enum UploadTransferError
    {
       UnknownError,
-      InvalidFileName,
-      InvalidContentType,
-      InvalidCipherText,
-      InvalidServerEncryptionKey,
-      InvalidClientEncryptionIV,
+      InvalidCiphertext,
       InvalidSignature,
-      InvalidX25519PublicKey,
-      InvalidEd25519PublicKey,
-      InvalidRequestedExpiration,
+      InvalidDigitalSignaturePublicKey,
+      InvalidDiffieHellmanPublicKey,
+      InvalidRecipientProof,
+      InvalidRequestedLifetimeHours,
       BlockedByUserPrivacy,
       OutOfSpace,
-      UserNotFound
+      RecipientNotFound
    }
 }
