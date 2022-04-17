@@ -33,6 +33,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -44,7 +45,7 @@ namespace Crypter.Web.Shared.Transfer
       public ClientAppSettings AppSettings { get; set; }
 
       protected const int MaxFileCount = 1;
-      protected const int FileReadBlockSize = 1048576;
+      protected const int Base64SafeChunkSize = 60000;
 
       protected long MaxFileSizeBytes;
       protected bool ShowProgressBar = false;
@@ -114,7 +115,7 @@ namespace Crypter.Web.Shared.Transfer
          var iv = AES.GenerateIV();
 
          await SetNewEncryptionStatus("Encrypting your file");
-         var ciphertext = await EncryptBytesAsync(SelectedFile, sendKey, iv);
+         var partitionedCiphertext = await EncryptBytesAsync(SelectedFile, sendKey, iv);
          await HideEncryptionProgress();
 
          await SetNewEncryptionStatus("Signing your file");
@@ -122,7 +123,10 @@ namespace Crypter.Web.Shared.Transfer
          await HideEncryptionProgress();
 
          await SetNewEncryptionStatus("Uploading");
-         var encodedCipherText = Convert.ToBase64String(ciphertext);
+         var encodedCipherText = partitionedCiphertext
+            .Select(x => Convert.ToBase64String(x))
+            .ToList();
+
          var encodedECDHSenderKey = Convert.ToBase64String(
             Encoding.UTF8.GetBytes(KeyConversion.ConvertX25519PrivateKeyFromPEM(senderX25519PrivateKey).GeneratePublicKey().ConvertToPEM().Value));
          var encodedECDSASenderKey = Convert.ToBase64String(
@@ -170,24 +174,23 @@ namespace Crypter.Web.Shared.Transfer
          EncryptionInProgress = false;
       }
 
-      protected async Task<byte[]> EncryptBytesAsync(IBrowserFile file, byte[] symmetricKey, byte[] symmetricIV)
+      protected async Task<List<byte[]>> EncryptBytesAsync(IBrowserFile file, byte[] symmetricKey, byte[] symmetricIV)
       {
          await SetProgressBar(0.0);
 
-         var fileBytes = await ReadFileAsync(file);
+         using var fileStream = file.OpenReadStream(MaxFileSizeBytes);
 
-         int chunksEncrypted = 0;
-         int chunkSize = (int)Math.Ceiling((double)fileBytes.Length / 100);
-         byte[] ciphertext = await SimpleEncryptionService.EncryptChunkedAsync(symmetricKey, symmetricIV, fileBytes, chunkSize,
-            async () =>
+         int chunkCount = (int)Math.Ceiling(file.Size / (double)Base64SafeChunkSize);
+         List<byte[]> ciphertextPartitions = new(chunkCount);
+
+         await SimpleEncryptionService.EncryptChunkedAsync(symmetricKey, symmetricIV, fileStream, file.Size, Base64SafeChunkSize,
+            async encryptedChunk =>
             {
-               chunksEncrypted++;
-               double bytesProcessed = chunksEncrypted * chunkSize;
-               double encryptionProgress = bytesProcessed / fileBytes.Length;
-               await SetProgressBar(encryptionProgress);
+               ciphertextPartitions.Insert(ciphertextPartitions.Count, encryptedChunk);
+               await SetProgressBar(ciphertextPartitions.Count / (double)ciphertextPartitions.Capacity);
             });
 
-         return ciphertext;
+         return ciphertextPartitions;
       }
 
       protected async Task<byte[]> SignBytesAsync(IBrowserFile file, PEMString ed25519PrivateKey)
@@ -226,9 +229,9 @@ namespace Crypter.Web.Shared.Transfer
          using var fileStream = file.OpenReadStream(MaxFileSizeBytes);
 
          int loadedFileBytes = 0;
-         while (loadedFileBytes + FileReadBlockSize < fileSize)
+         while (loadedFileBytes + Base64SafeChunkSize < fileSize)
          {
-            loadedFileBytes += await fileStream.ReadAsync(plaintextBytes.AsMemory(loadedFileBytes, FileReadBlockSize));
+            loadedFileBytes += await fileStream.ReadAsync(plaintextBytes.AsMemory(loadedFileBytes, Base64SafeChunkSize));
          }
 
          int remainingBytesToRead = fileSize - loadedFileBytes;

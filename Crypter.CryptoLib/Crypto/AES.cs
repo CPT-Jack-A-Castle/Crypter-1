@@ -75,9 +75,19 @@ namespace Crypter.CryptoLib.Crypto
          _cipher.Init(forEncryption, new ParametersWithIV(keyParam, iv));
       }
 
+      public int GetUpdateOutputSize(int inputLength)
+      {
+         return _cipher.GetUpdateOutputSize(inputLength);
+      }
+
       public int GetOutputSize(int inputLength)
       {
          return _cipher.GetOutputSize(inputLength);
+      }
+
+      public byte[] ProcessChunk(byte[] input)
+      {
+         return _cipher.ProcessBytes(input);
       }
 
       public int ProcessChunk(byte[] input, int inputOffset, int length, byte[] output, int outputOffset)

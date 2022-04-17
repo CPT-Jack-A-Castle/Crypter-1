@@ -28,7 +28,6 @@ using Crypter.CryptoLib.Crypto;
 using Crypter.CryptoLib.Enums;
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.IO;
 
 namespace Crypter.Test.CryptoLib_Tests.Crypto_Tests

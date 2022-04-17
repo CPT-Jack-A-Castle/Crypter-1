@@ -24,11 +24,13 @@
  * Contact the current copyright holder to discuss commercial license options.
  */
 
+using System.Collections.Generic;
+
 namespace Crypter.Contracts.Features.Transfer.Upload
 {
    public interface IUploadTransferRequest
    {
-      string CipherTextBase64 { get; set; }
+      List<string> CipherTextBase64 { get; set; }
       string SignatureBase64 { get; set; }
       string ClientEncryptionIVBase64 { get; set; }
       string ServerEncryptionKeyBase64 { get; set; }

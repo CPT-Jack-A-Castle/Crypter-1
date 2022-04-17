@@ -26,13 +26,17 @@
 
 using Crypter.Common.Primitives;
 using Crypter.CryptoLib.Crypto;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace Crypter.CryptoLib.Services
 {
    public interface ISimpleSignatureService
    {
-      public byte[] Sign(PEMString ed25519PrivateKey, byte[] data);
-      public bool Verify(PEMString ed25519PublicKey, byte[] data, byte[] signature);
+      byte[] Sign(PEMString ed25519PrivateKey, byte[] data);
+      Task<byte[]> SignChunkedAsync(PEMString ed25519PrivateKey, Stream stream, int chunkSize, Func<Task> progress);
+      bool Verify(PEMString ed25519PublicKey, byte[] data, byte[] signature);
    }
 
    public class SimpleSignatureService : ISimpleSignatureService
@@ -44,6 +48,26 @@ namespace Crypter.CryptoLib.Services
          var signer = new ECDSA();
          signer.InitializeSigner(privateKey);
          signer.SignerDigestChunk(data);
+         return signer.GenerateSignature();
+      }
+
+      public async Task<byte[]> SignChunkedAsync(PEMString ed25519PrivateKey, Stream stream, int chunkSize, Func<Task> progress)
+      {
+         var privateKey = KeyConversion.ConvertEd25519PrivateKeyFromPEM(ed25519PrivateKey);
+
+         var signer = new ECDSA();
+         signer.InitializeSigner(privateKey);
+
+         int bytesRead = 1;
+         while (bytesRead > 0)
+         {
+            byte[] readBuffer = new byte[chunkSize];
+            bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, chunkSize));
+
+            signer.SignerDigestChunk(readBuffer);
+            await progress.Invoke();
+         }
+
          return signer.GenerateSignature();
       }
 
